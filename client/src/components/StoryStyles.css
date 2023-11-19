@@ -1,0 +1,28 @@
+/* src/components/StoryStyles.css */
+.message {
+    margin: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    color: white;
+  }
+  
+  .narrator {
+    background-color: #666;
+  }
+  
+  .character1 {
+    background-color: #8AB0AB;
+  }
+  
+  .character2 {
+    background-color: #FF7F50;
+  }
+  
+  .character3 {
+    background-color: #6A8D73;
+  }
+  
+  .user {
+    background-color: #FFD700;
+  }
+  

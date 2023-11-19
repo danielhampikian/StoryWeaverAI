@@ -1,32 +1,34 @@
 // src/App.js
 import React, { useState } from 'react';
 import axios from 'axios';
+import StoryInteraction from './components/StoryInteraction';
+import StoryDisplay from './components/StoryDisplay';
+import './components/StoryStyles.css'; // Assuming you have a CSS file for styling
 
 function App() {
-    const [prompt, setPrompt] = useState('');
-    const [story, setStory] = useState('');
+    const [storySegments, setStorySegments] = useState([]);
 
-    const generateStory = async (e) => {
-        e.preventDefault();
+    const generateStory = async ({ creativityLevel, numCharacters, emotionalVariance }) => {
         try {
-            const response = await axios.post('/api/generateStory', { prompt });
-            setStory(story => story + '\n' + response.data.storyPart);
+            const response = await axios.post('/api/generateStory', {
+                creativityLevel, 
+                numCharacters, 
+                emotionalVariance
+            });
+            const newSegment = {
+                character: 'narrator', // You might want to adjust this based on your backend response
+                text: response.data.story
+            };
+            setStorySegments(oldSegments => [...oldSegments, newSegment]);
         } catch (error) {
             console.error('Error in generating story:', error);
         }
     };
 
     return (
-        <div>
-            <form onSubmit={generateStory}>
-                <input 
-                    type="text" 
-                    value={prompt} 
-                    onChange={(e) => setPrompt(e.target.value)} 
-                />
-                <button type="submit">Add to Story</button>
-            </form>
-            <div>{story}</div>
+        <div className="app">
+            <StoryInteraction onSubmit={generateStory} />
+            <StoryDisplay storySegments={storySegments} />
         </div>
     );
 }
