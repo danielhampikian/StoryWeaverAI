@@ -57,6 +57,7 @@ function StoryInteraction({ onSubmit }) {
         <button type="submit">Generate Story</button>
       </form>
     </div>
+    
   );
 }
 
