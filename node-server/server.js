@@ -6,7 +6,7 @@ const app = express();
 
 app.use(express.json());
 
-// Later, you'll serve the React build directory here
+//Later, you'll serve the React build directory here
 // app.use(express.static('../build'));
 
 const PORT = process.env.PORT || 5000;
