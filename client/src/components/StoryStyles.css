@@ -25,4 +25,13 @@
   .user {
     background-color: #FFD700;
   }
+
+  .error {
+    margin: 10px;
+    color: #b00020;
+  }
+
+  .message p {
+    white-space: pre-wrap;
+  }
   

@@ -1,7 +1,7 @@
 // src/components/StoryInteraction.js
 import React, { useState } from 'react';
 
-function StoryInteraction({ onSubmit }) {
+function StoryInteraction({ onSubmit, isLoading = false }) {
   const [creativityLevel, setCreativityLevel] = useState(5);
   const [numCharacters, setNumCharacters] = useState(2);
   const [emotionalVariance, setEmotionalVariance] = useState(5);
@@ -9,9 +9,9 @@ function StoryInteraction({ onSubmit }) {
   const handleFormSubmit = (e) => {
     e.preventDefault();
     onSubmit({
-      creativityLevel, 
-      numCharacters, 
-      emotionalVariance
+      creativityLevel: Number(creativityLevel),
+      numCharacters: Number(numCharacters),
+      emotionalVariance: Number(emotionalVariance)
     });
   };
 
@@ -54,7 +54,9 @@ function StoryInteraction({ onSubmit }) {
             />
           </label>
         </div>
-        <button type="submit">Generate Story</button>
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? 'Generating...' : 'Generate Story'}
+        </button>
       </form>
     </div>
     
