@@ -14,5 +14,6 @@ StoryWeaverAI is an interactive storytelling platform that merges AI-driven narr
 - clone  this repo and install (if needed) node
 - obtain an api key and set up a payment method for tokens from openai
 - create an api key in openai and a .env file in your newly cloned local code in the node-server directory and enter your api key like so: OPENAI_API_KEY=YOUR_API_KEY_HERE
-- cd to node-server directory and run: node server.js
-- in a seperate terminal, cd to client directory and run: npm start
+  - optionally set OPENAI_MODEL in the same file to choose the chat model (defaults to gpt-4o-mini)
+- cd to node-server directory and run: npm install, then: npm start (or node server.js). The API listens on port 5000.
+- in a seperate terminal, cd to client directory and run: npm install, then: npm start (requests to /api are proxied to port 5000)

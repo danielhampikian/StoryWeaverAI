@@ -1,7 +1,8 @@
-// server/server.js
+// node-server/server.js
 require('dotenv').config();
 const express = require('express');
-const axios = require('axios');
+const storyRoutes = require('./storyRoutes');
+
 const app = express();
 
 app.use(express.json());
@@ -9,18 +10,17 @@ app.use(express.json());
 //Later, you'll serve the React build directory here
 // app.use(express.static('../build'));
 
+app.use('/api', storyRoutes);
+
 const PORT = process.env.PORT || 5000;
 
-// OpenAI API setup
-const OPENAI_API_URL = 'https://api.openai.com/v1/engines/davinci-codex/completions';
-const API_KEY = process.env.OPENAI_API_KEY;
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Server listening on port ${PORT}`);
+        if (!process.env.OPENAI_API_KEY) {
+            console.warn('Warning: OPENAI_API_KEY is not set; story generation requests will fail.');
+        }
+    });
+}
 
-// Endpoint to generate story
-app.post('/api/generateStory', async (req, res) => {
-    // Add the logic to interact with OpenAI API
-    // and handle the story generation
-});
-
-app.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-});
+module.exports = app;
