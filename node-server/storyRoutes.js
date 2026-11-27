@@ -1,6 +1,6 @@
 // node-server/storyRoutes.js
 const express = require('express');
-const axios = require('axios');
+const { getProvider } = require('./providers');
 const router = express.Router();
 
 
@@ -27,9 +27,7 @@ const createCharacterProfiles = (numCharacters) => {
   return characters;
 };
 
-// Modify your createStoryPrompt function
-const createStoryPrompt = (creativityLevel, numCharacters, emotionalVariance) => {
-  let characters = createCharacterProfiles(numCharacters);
+const createStoryPrompt = (characters, creativityLevel, emotionalVariance) => {
   let prompt = `Create a story with the following characters: `;
 
   characters.forEach((char, index) => {
@@ -57,40 +55,11 @@ const toBoundedInt = (value, min, max) => {
 const creativityToTemperature = (creativityLevel) =>
   Number((0.3 + ((creativityLevel - 1) / 9) * 0.9).toFixed(2));
 
-// Function to call the OpenAI Chat Completions API
-const generateStoryFromOpenAI = async (prompt, temperature) => {
-  const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-
-  const response = await axios.post(`${baseUrl}/chat/completions`, {
-    model,
-    messages: [
-      { role: 'system', content: 'You are a creative storyteller who writes vivid, engaging short stories.' },
-      { role: 'user', content: prompt }
-    ],
-    temperature,
-    max_tokens: 800
-  }, {
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    timeout: 60000
-  });
-
-  const story = response.data?.choices?.[0]?.message?.content;
-  if (!story) {
-    throw new Error('OpenAI response did not contain any story text');
-  }
-  return story.trim();
-};
-
 // Endpoint to generate story
 router.post('/generateStory', async (req, res) => {
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({
-      error: 'OPENAI_API_KEY is not configured on the server. Add it to node-server/.env and restart the server.'
-    });
+  const provider = getProvider();
+  if (provider.configError) {
+    return res.status(500).json({ error: provider.configError });
   }
 
   const body = req.body || {};
@@ -104,17 +73,23 @@ router.post('/generateStory', async (req, res) => {
     });
   }
 
-  const prompt = createStoryPrompt(creativityLevel, numCharacters, emotionalVariance);
+  const characters = createCharacterProfiles(numCharacters);
 
   try {
-    const story = await generateStoryFromOpenAI(prompt, creativityToTemperature(creativityLevel));
-    res.json({ story });
+    const story = await provider.generateStory({
+      prompt: createStoryPrompt(characters, creativityLevel, emotionalVariance),
+      temperature: creativityToTemperature(creativityLevel),
+      maxTokens: 800,
+      story: { characters, creativityLevel, emotionalVariance }
+    });
+    res.json({ story, provider: provider.name });
   } catch (error) {
     const status = error.response?.status;
-    const detail = error.response?.data?.error?.message || error.message;
-    console.error('Story generation failed:', status || '', detail);
+    const data = error.response?.data;
+    const detail = data?.error?.message || (typeof data?.error === 'string' ? data.error : null) || error.message;
+    console.error(`Story generation failed (${provider.name}):`, status || '', detail);
     res.status(502).json({
-      error: `Failed to generate story${status ? ` (OpenAI returned ${status})` : ''}: ${detail}`
+      error: `Failed to generate story with ${provider.name}${status ? ` (returned ${status})` : ''}: ${detail}`
     });
   }
 });
