@@ -4,8 +4,10 @@ const http = require('node:http');
 const app = require('../server');
 const { buildMockStory } = require('../providers/mock');
 
+// server.js loads node-server/.env; these are cleared before every test so no real API is called
 const PROVIDER_ENV_VARS = [
-  'AI_PROVIDER', 'MOCK_DELAY_MS', 'HF_TOKEN', 'HF_MODEL', 'HF_BASE_URL',
+  'AI_PROVIDER', 'MOCK_DELAY_MS', 'OPENROUTER_API_KEY', 'OPENROUTER_MODEL', 'OPENROUTER_BASE_URL',
+  'OPENROUTER_FALLBACK_MODELS', 'OPENROUTER_SITE_URL', 'HF_TOKEN', 'HF_MODEL', 'HF_BASE_URL',
   'OPENAI_COMPAT_BASE_URL', 'OPENAI_COMPAT_API_KEY', 'OPENAI_COMPAT_MODEL',
   'OLLAMA_URL', 'OLLAMA_MODEL', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'OPENAI_BASE_URL',
   'ANTHROPIC_API_KEY', 'ANTHROPIC_MODEL', 'ANTHROPIC_BASE_URL'
@@ -15,6 +17,9 @@ let server;
 let upstream;
 let upstreamUrl;
 let lastUpstreamRequest;
+let upstreamRequests;
+// Per-test override: (request) => ({ status, body }) or undefined for the default reply
+let upstreamReply;
 
 before(async () => {
   server = app.listen(0);
@@ -23,11 +28,16 @@ before(async () => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       lastUpstreamRequest = { url: req.url, headers: req.headers, body: JSON.parse(body) };
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      const reply = req.url.endsWith('/messages')
-        ? { content: [{ type: 'text', text: ' Anthropic story ' }] }
-        : { choices: [{ message: { role: 'assistant', content: ' Chat story ' } }] };
-      res.end(JSON.stringify(reply));
+      upstreamRequests.push(lastUpstreamRequest);
+      const custom = upstreamReply && upstreamReply(lastUpstreamRequest);
+      const reply = custom || {
+        status: 200,
+        body: req.url.endsWith('/messages')
+          ? { content: [{ type: 'text', text: ' Anthropic story ' }] }
+          : { model: lastUpstreamRequest.body.model, choices: [{ message: { role: 'assistant', content: ' Chat story ' } }] }
+      };
+      res.writeHead(reply.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(reply.body));
     });
   }).listen(0);
   upstreamUrl = `http://localhost:${upstream.address().port}`;
@@ -42,6 +52,8 @@ beforeEach(() => {
   PROVIDER_ENV_VARS.forEach(name => delete process.env[name]);
   process.env.MOCK_DELAY_MS = '0';
   lastUpstreamRequest = null;
+  upstreamRequests = [];
+  upstreamReply = undefined;
 });
 
 const generate = async (payload = { creativityLevel: 9, numCharacters: 3, emotionalVariance: 2 }) => {
