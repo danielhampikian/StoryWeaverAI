@@ -1,13 +1,7 @@
 // Free, offline story generator: builds a story from templates using the chosen
 // characters, creativity level and emotional variance. No network, no API key.
 
-const NAMES = {
-  human: ['Mara', 'Theo', 'Ines', 'Jonah', 'Priya'],
-  robot: ['Unit K-7', 'Bolt', 'Cog-9', 'Vesper', 'Tink'],
-  alien: ["Zyx'ara", 'Quorl', 'Ixa', 'Nemo-Prime', 'Vrell'],
-  animal: ['Pip the fox', 'Barnaby the tortoise', 'Juniper the raven', 'Moss the badger', 'Clementine the cat'],
-  mutant: ['Glimmer', 'Brack', 'Hollow Jane', 'Sev', 'Ember']
-};
+const { NAMES } = require('../characters');
 
 const TRAIT_ACTIONS = {
   brave: 'stepped forward without hesitation',
@@ -81,16 +75,95 @@ const buildMockStory = ({ characters, creativityLevel, emotionalVariance }, rand
     .join('\n\n');
 };
 
-const createMockProvider = ({ delayMs = 0 } = {}) => ({
-  name: 'mock',
-  model: 'template',
-  configError: null,
-  async generateStory({ story }) {
-    if (delayMs > 0) {
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-    return buildMockStory(story);
-  }
-});
+// --- Interactive (turn-by-turn) mock ---
 
-module.exports = { createMockProvider, buildMockStory };
+const HOOKS = [
+  'Somewhere close by, a door that had been locked for years clicked open.',
+  'Then a voice none of them recognised called their names from the dark.',
+  'At that exact moment, the ground beneath them gave a long, low shudder.',
+  'A folded note slid out from under a stone, addressed to all of them.'
+];
+
+const TWISTS = [
+  ['It did not go quite to plan, but nothing was broken that could not be fixed.', 'Halfway through, they found an old set of footprints leading somewhere new.'],
+  ['The moment they did, every lantern in sight flickered and turned a deep shade of blue.', 'It worked, and it also woke something that had been sleeping a very long time.'],
+  ['Reality hiccupped: for three heartbeats everyone spoke only in birdsong.', 'The sky folded in half like paper and a staircase unrolled down to meet them.']
+];
+
+const MOOD_BEATS = [
+  ['They traded a calm look and carried on.', 'Nobody panicked; there was even time for a small joke.'],
+  ['Hope flickered, then doubt, and for a moment they argued about what it meant.', 'Their hearts were pounding now, though nobody wanted to admit it.'],
+  ['Someone screamed; someone else laughed far too loudly. Nothing would ever be the same.', 'Tears stung, tempers flared, and a promise was made that could not be taken back.']
+];
+
+const choicePool = (cast) => {
+  const a = cast[0]?.name || 'the hero';
+  const b = (cast[1] || cast[0])?.name || 'a stranger';
+  return [
+    `${a} investigates the strange sound`,
+    `Ask ${b} what they are really hiding`,
+    'Run for the nearest exit before it is too late',
+    `${b} tries something reckless`,
+    'Follow the trail deeper into the unknown',
+    'Stop, listen, and wait to see what happens'
+  ];
+};
+
+const pickDistinct = (array, count, random) => {
+  const pool = [...array];
+  const picked = [];
+  while (picked.length < count && pool.length) {
+    picked.push(pool.splice(Math.floor(random() * pool.length), 1)[0]);
+  }
+  return picked;
+};
+
+const formatChoices = (choices) => `CHOICES:\n${choices.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
+
+// context: { kind: 'start' | 'continue', setup: { premise, creativityLevel, emotionalVariance }, characters, action }
+const buildMockTurn = ({ kind, setup = {}, characters = [], action }, random = Math.random) => {
+  const cast = characters.length ? characters : [{ name: 'Mara', type: 'human', trait: 'brave' }];
+  const creativity = tier(setup.creativityLevel || 5);
+  const emotion = tier(setup.emotionalVariance || 5);
+  let paragraphs;
+
+  if (kind === 'start') {
+    const premise = (setup.premise || '').trim().replace(/[.!?]+$/, '');
+    const opening = `In ${pick(SETTINGS[creativity], random)}, ${pick(PROBLEMS[creativity], random)}.` +
+      (premise ? ` Nobody knew it yet, but this was the start of a tale best summed up as: ${premise}.` : '');
+    const introductions = cast
+      .map(c => `${c.name}, ${withArticle(c.trait)} ${c.type}, ${TRAIT_ACTIONS[c.trait] || 'watched carefully'}.`)
+      .join(' ');
+    paragraphs = [opening, introductions, `${pick(MOOD_BEATS[emotion], random)} ${pick(HOOKS, random)}`];
+  } else {
+    const actor = pick(cast, random);
+    const cleanAction = String(action || '').trim().replace(/[.!?]+$/, '');
+    paragraphs = [
+      `"${cleanAction}." That was the plan, and ${actor.name} saw it through without a second thought.`,
+      `${pick(TWISTS[creativity], random)} ${pick(MOOD_BEATS[emotion], random)}`,
+      pick(HOOKS, random)
+    ];
+  }
+
+  return [...paragraphs, formatChoices(pickDistinct(choicePool(cast), 3, random))].join('\n\n');
+};
+
+const createMockProvider = ({ delayMs = 0 } = {}) => {
+  const wait = () => (delayMs > 0 ? new Promise(resolve => setTimeout(resolve, delayMs)) : Promise.resolve());
+  return {
+    name: 'mock',
+    model: 'template',
+    fallbackModels: [],
+    configError: null,
+    async complete({ context }) {
+      await wait();
+      return { text: buildMockTurn(context || {}), model: 'template', attempts: [] };
+    },
+    async generateStory({ story }) {
+      await wait();
+      return buildMockStory(story);
+    }
+  };
+};
+
+module.exports = { createMockProvider, buildMockStory, buildMockTurn };
